@@ -3,6 +3,7 @@ let latestAnswerMarkdown = "";
 
 function setPrompt(text) {
     document.getElementById("userInput").value = text;
+    document.getElementById("userInput").focus();
 }
 
 function setLoading(isLoading) {
@@ -48,7 +49,7 @@ function showResult(answer, threadId) {
         resultBox.innerText = answer;
     }
 
-    threadInfo.textContent = `Thread ID: ${threadId}`;
+    threadInfo.textContent = `THREAD — ${threadId}`;
 
     resultSection.classList.remove("hidden");
 
@@ -139,9 +140,27 @@ function downloadPDF() {
     downloadBtn.textContent = "Preparing PDF...";
     downloadBtn.disabled = true;
 
+    // Save current inline overrides so we can restore them exactly
+    const originalMaxHeight = pdfContent.style.maxHeight;
+
+    const resultBox = document.getElementById("resultBox");
+    const originalBoxMaxHeight = resultBox ? resultBox.style.maxHeight : "";
+    const originalBoxOverflow = resultBox ? resultBox.style.overflowY : "";
+
+    // Force every descendant (headings, table cells, code blocks) to
+    // print-safe colors — recoloring only the wrapper isn't enough, since
+    // child elements carry their own darker theme colors. Also expand the
+    // scroll box so the exported PDF isn't cut off mid-content.
+    pdfContent.classList.add("pdf-export-mode");
+
+    if (resultBox) {
+        resultBox.style.maxHeight = "none";
+        resultBox.style.overflowY = "visible";
+    }
+
     const options = {
         margin: 0.5,
-        filename: "ai-travel-plan.pdf",
+        filename: "tripmate-ai-itinerary.pdf",
         image: {
             type: "jpeg",
             quality: 0.98
@@ -161,17 +180,26 @@ function downloadPDF() {
         }
     };
 
+    const restoreStyles = () => {
+        pdfContent.classList.remove("pdf-export-mode");
+        pdfContent.style.maxHeight = originalMaxHeight;
+
+        if (resultBox) {
+            resultBox.style.maxHeight = originalBoxMaxHeight;
+            resultBox.style.overflowY = originalBoxOverflow;
+        }
+
+        downloadBtn.textContent = oldText;
+        downloadBtn.disabled = false;
+    };
+
     html2pdf()
         .set(options)
         .from(pdfContent)
         .save()
-        .then(() => {
-            downloadBtn.textContent = oldText;
-            downloadBtn.disabled = false;
-        })
+        .then(restoreStyles)
         .catch(() => {
-            downloadBtn.textContent = oldText;
-            downloadBtn.disabled = false;
+            restoreStyles();
             showError("Could not download PDF.");
         });
 }
